@@ -136,7 +136,7 @@ The `nersc_ssh.sh` script is quite simple, most of the code really just handles 
 
 However, the 1Password integration required a slight modification to `sshproxy.sh` to pass the password and OTP automatically (via the `-w` flag).These are retrieved by `nersc_ssh.sh` from 1Password if the `--onepass <name>` flag is passed. If it's not, the script reverts to manual entry (default `sshproxy.sh` behavior). According to the license (at `/global/cfs/cdirs/mfa/NERSC-MFA/LICENSE.md` on NERSC's community file system), modifications to `sshproxy.sh` are allowed. 
 
-If you don't want to use 1Password, you can just replace the `sshproxy.sh` file from this repo with the default one supplied by NERSC for peace of mind. You can see the differences between my file and NERSC's original file here [commit](link to commit).
+If you don't want to use 1Password, you can just replace the `sshproxy.sh` file from this repo with the default one supplied by NERSC for peace of mind. You can see the differences between my file and NERSC's original file here [commit](https://github.com/oashour/NERSC-SSH-1Password/commit/75588cea373ce000995a66e013f3955fef5479eb#diff-befc582385c02a8d054617f7656c321afaedf826ff7a182148c3fc684cb60d7d).
 
 ## Potential Improvements and Extra Security
 Under normal circumstances, the cleanest way to use the 1Password CLI for an application like this is via `.env` files and `op run` (see [here](https://developer.1password.com/docs/cli/secrets-environment-variables#use-environment-env-files). For example:
