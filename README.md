@@ -1,6 +1,6 @@
 # NERSC SSH Utilities
 
-[Demo](demo.gif)
+![Demo](demo.gif)
 
 This is a wrapper for NERSC's [sshproxy](https://docs.nersc.gov/connect/mfa/#sshproxy) utility. It is aimed for *nix systems, but was only tested on MacOS.
 
