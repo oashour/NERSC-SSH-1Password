@@ -1,13 +1,17 @@
 #!/bin/bash
 
-#############################################################################################################################
-# Short script to automatically check 24hr certificate validity every time you connect to NERSC systems
-# This script uses NERSC's sshproxy script
-# Please read https://www.nersc.gov/users/connecting-to-nersc/connecting-with-ssh/ for more information
+####################################################################################
+# A script that integrates 1Password with NERSC's sshproxy service.
+# Can also use without 1P to get automatic connection with credentials prompt every 
+# 24 hours.
+# Please read the README.md and what's linked within.
 #
-# Script written by Omar A. Ashour, UC Berkeley Physics. (2019/09/06)
-# Last Updated 2022/09/21
-###########################################################################################################################
+# Script written by Omar A. Ashour, UC Berkeley, Physics Department
+# and Lawrence Berkeley National Lab, Molecular Foundry and Materials Sciences Division
+# Original version was written on 2019/09/06.
+#
+# Currently hosted and updated on GitHub oashour/NERSC-SSH-1Password
+####################################################################################
 
 # Set up colors
 R=$'\e[31m' # Red
@@ -18,9 +22,11 @@ RS=$'\e[0m' # Reset
 
 # Specify Defaults
 NERSC_USER=${USER}
-CLUSTER=perlmutter
+CLUSTER=perlmutter # RIP Cori 2017-2023
 CERTNAME=nersc
-SSHPROXY=$(pwd)/sshproxy.sh
+# Figure out where the script is installed
+ROOT=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+SSHPROXY=${ROOT}/sshproxy.sh
 PUTTY=" "
 
 # Usage function
@@ -34,7 +40,7 @@ usage () {
 	printf "\t\t\t\t\t\t(default: ${CERTNAME})\n"
 	printf "\t -s, --sshproxy <sshproxy>\t\tAbsolute path for sshproxy.sh script\n"
 	printf "\t\t\t\t\t\t(default: ${SSHPROXY})\n"
-	printf "\t     --onepass <1password_entry>\tName of the 1password entry with NERSC credentials\n"
+	printf "\t -w, --onepass <1password_entry>\tName of the 1password entry with NERSC credentials\n"
 	printf "\t -p, --putty\t\t\t\tGet keys in PuTTY compatible (ppk) format.\n"
 	printf "\t\t\t\t\t\t(This flag is sort of pointless since this is a *nix script)\n"
 	printf "\t -h, --help \t\t\t\tPrint this usage message and exit\n"
@@ -100,7 +106,7 @@ while [[ $# -gt 0 ]]; do
       PUTTY=" -p "
       shift
       ;;
-    --onepass)
+    -w|--onepass)
       ONEPASS="${2}"
       if [ -z ${ONEPASS} ]; then
           echo -e "${R}${1} needs an argument.${RS}"
@@ -142,7 +148,6 @@ fi
 echo -e "${Y}NERSC username:${RS} ${NERSC_USER}"
 echo -e "${Y}Cluster:${RS} ${CLUSTER}"
 echo -e "${Y}Certificate name:${RS} ${CERTNAME}"
-echo -e "${Y}sshproxy:${RS} ${SSHPROXY}"
 echo -e "${Y}putty:${RS} ${PUTTY_BOOL}"
 if [[ ! -z ${ONEPASS} ]]; then
     echo "${Y}1password entry:${RS} ${ONEPASS}"
@@ -151,17 +156,27 @@ fi
 # Generate new certificate
 function gen_cert {
     echo -e "${B}Generating new certificate.${RS}"
-    if [[ ! -z ${ONEPASS} ]]; then
-        echo -e "${B}1Password mode detected, retrieving credentials.${RS}"
-        NERSC_PASS=$(op item get ${ONEPASS} --field password)
-        NERSC_OTP=$(op item get ${ONEPASS} --otp)
-        cmd="${SSHPROXY} -u ${NERSC_USER}${PUTTY}-o ${CERTPATH}${CERTNAME} -w ${NERSC_PASS}${NERSC_OTP}"
-    else
-        cmd="${SSHPROXY} -u ${NERSC_USER}${PUTTY}-o ${CERTPATH}${CERTNAME}"
-    fi
-    # Add stuff to handle the putty command
+    # Check if file existsw
     if [ -f ${SSHPROXY} ]; then
         { # try
+            # if 1Password mode is enabled
+            if [[ ! -z ${ONEPASS} ]]; then
+                echo -e "${B}1Password mode detected, retrieving credentials.${RS}"
+                NERSC_PASS=$(op item get ${ONEPASS} --field password)
+                # Check if 1P authenticated properly
+                if [ ! $? -eq 0 ]; then
+                    echo "${R}1Password CLI failed. Unable to obtain password.${RS}" && return 1
+                fi
+                NERSC_OTP=$(op item get ${ONEPASS} --otp)
+                # Check if OTP was obtained successfully
+                # Normally if you authenticate the first time this will automatically work.
+                if [ ! $? -eq 0 ]; then
+                    echo "${R}1Password CLI failed. Unable to obtain OTP.${RS}" && return 1
+                fi
+                cmd="${SSHPROXY} -u ${NERSC_USER}${PUTTY}-o ${CERTPATH}${CERTNAME} -w ${NERSC_PASS}${NERSC_OTP}"
+            else
+                cmd="${SSHPROXY} -u ${NERSC_USER}${PUTTY}-o ${CERTPATH}${CERTNAME}"
+            fi
             eval "$cmd" && echo -e "${G}New Certificate Generated${RS}" && return 0
         } || { # catch
             echo -e "${R}Certificate generation failed.${RS}" && return 1
@@ -188,28 +203,25 @@ function cert_check {
         # Some formatted strings for printing
         expdate=$(date -j -f "%Y-%m-%dT%H:%M:%S" ${date} "+%Y-%m-%d")
         exptime=$(date -j -f "%Y-%m-%dT%H:%M:%S" ${date} "+%H:%M:%S")
-        if [ ${now} -ge ${expiry} ];
-        then
+        if [ ${now} -ge ${expiry} ]; then
             echo -e "${R}Certificate expired on ${expdate} at ${exptime}!${RS}"
             { # try
                 echo "------------------------------------------"
-                gen_cert "${B}Proceeding with connection.${RS}"
-                echo "------------------------------------------"
+                gen_cert && echo -e "${B}Proceeding with connection.${RS}" && return 0
+                #echo "------------------------------------------"
                 return 0
             } || { # catch
                 return 1
             }
-    else
-        echo -e "${G}Certificate valid till ${expdate} at ${exptime}! Proceeding with connection.${RS}"
-        return 
-    fi 
+        else
+            echo -e "${G}Certificate valid till ${expdate} at ${exptime}! Proceeding with connection.${RS}" && return 0
+        fi 
     else
         echo -e "${R}Certificate file not found.${RS}"
         { # try
             echo "------------------------------------------"
-            gen_cert && echo -e "${B}Proceeding with connection.${RS}"
-            echo "------------------------------------------"
-            return 0
+            gen_cert && echo -e "${B}Proceeding with connection.${RS}" && return 0
+            #echo "------------------------------------------"
         } || { # catch
             return 1
         }
@@ -224,6 +236,5 @@ else
     HOST="cori.nersc.gov"
 fi
 
-
-
+# Run certificate check and connect
 cert_check && ssh ${NERSC_USER}@${HOST}
