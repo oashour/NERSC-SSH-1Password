@@ -165,24 +165,24 @@ function gen_cert {
                 NERSC_PASS=$(op item get ${ONEPASS} --field password)
                 # Check if 1P authenticated properly
                 if [ ! $? -eq 0 ]; then
-                    echo "${R}1Password CLI failed. Unable to obtain password.${RS}" && return 1
+                    echo "${R}1Password CLI failed. Unable to obtain password.${RS}"; return 1;
                 fi
                 NERSC_OTP=$(op item get ${ONEPASS} --otp)
                 # Check if OTP was obtained successfully
                 # Normally if you authenticate the first time this will automatically work.
                 if [ ! $? -eq 0 ]; then
-                    echo "${R}1Password CLI failed. Unable to obtain OTP.${RS}" && return 1
+                    echo "${R}1Password CLI failed. Unable to obtain OTP.${RS}"; return 1;
                 fi
                 cmd="${SSHPROXY} -u ${NERSC_USER}${PUTTY}-o ${CERTPATH}${CERTNAME} -w ${NERSC_PASS}${NERSC_OTP}"
             else
                 cmd="${SSHPROXY} -u ${NERSC_USER}${PUTTY}-o ${CERTPATH}${CERTNAME}"
             fi
-            eval "$cmd" && echo -e "${G}New Certificate Generated${RS}" && return 0
+            eval "$cmd" && { echo -e "${G}New Certificate Generated${RS}"; return 0; }
         } || { # catch
-            echo -e "${R}Certificate generation failed.${RS}" && return 1
+            echo -e "${R}Certificate generation failed.${RS}"; return 1;
         }
     else
-        echo -e "${R}File ${SSHPROXY} does not exist.${RS}" && return 1
+        echo -e "${R}File ${SSHPROXY} does not exist.${RS}"; return 1;
     fi
 }
 
@@ -207,20 +207,19 @@ function cert_check {
             echo -e "${R}Certificate expired on ${expdate} at ${exptime}!${RS}"
             { # try
                 echo "------------------------------------------"
-                gen_cert && echo -e "${B}Proceeding with connection.${RS}" && return 0
+                gen_cert && { echo -e "${B}Proceeding with connection.${RS}"; return 0; }
                 #echo "------------------------------------------"
-                return 0
             } || { # catch
                 return 1
             }
         else
-            echo -e "${G}Certificate valid till ${expdate} at ${exptime}! Proceeding with connection.${RS}" && return 0
+            echo -e "${G}Certificate valid till ${expdate} at ${exptime}! Proceeding with connection.${RS}"; return 0
         fi 
     else
         echo -e "${R}Certificate file not found.${RS}"
         { # try
             echo "------------------------------------------"
-            gen_cert && echo -e "${B}Proceeding with connection.${RS}" && return 0
+            gen_cert && { echo -e "${B}Proceeding with connection.${RS}"; return 0; }
             #echo "------------------------------------------"
         } || { # catch
             return 1
